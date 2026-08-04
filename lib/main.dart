@@ -888,16 +888,36 @@ class TicketBookingScreen extends StatefulWidget {
 }
 
 class _TicketBookingScreenState extends State<TicketBookingScreen> {
-  String sourceStop = "Vengal College";
-  String destinationStop = "Pattabiram";
+  // 1. Controllers holding the dynamic data
+  final TextEditingController sourceController = TextEditingController(
+    text: "Vengal College",
+  );
+  final TextEditingController destinationController = TextEditingController(
+    text: "Pattabiram",
+  );
+  final TextEditingController routeController = TextEditingController(
+    text: "580",
+  );
+  final TextEditingController fareController = TextEditingController(
+    text: "29",
+  );
+
   int passengerCount = 1;
-  final int pricePerTicket = 29;
+
+  @override
+  void dispose() {
+    sourceController.dispose();
+    destinationController.dispose();
+    routeController.dispose();
+    fareController.dispose();
+    super.dispose();
+  }
 
   void _toggleStops() {
     setState(() {
-      String temp = sourceStop;
-      sourceStop = destinationStop;
-      destinationStop = temp;
+      String temp = sourceController.text;
+      sourceController.text = destinationController.text;
+      destinationController.text = temp;
     });
   }
 
@@ -907,33 +927,113 @@ class _TicketBookingScreenState extends State<TicketBookingScreen> {
     });
   }
 
+  // --- NEW: Dialog to edit Source/Destination ---
+  Future<void> _editValueDialog(
+    String title,
+    TextEditingController controller,
+  ) async {
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text("Edit $title"),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: "Enter new $title",
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {}); // Refreshes the UI to show what you typed
+                Navigator.pop(context);
+              },
+              child: const Text("Save"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // --- NEW: Dialog to edit Route & Fare together ---
+  Future<void> _editRouteAndFareDialog() async {
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text("Edit Route & Fare"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: routeController,
+                decoration: const InputDecoration(
+                  labelText: "Route (e.g. 580 MAG)",
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: fareController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: "Fare (e.g. 31)"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {}); // Refreshes the UI
+                Navigator.pop(context);
+              },
+              child: const Text("Save"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    int totalAmount = passengerCount * pricePerTicket;
+    // Dynamically calculate the total amount based on what is typed in the fare controller
+    int currentFare = int.tryParse(fareController.text) ?? 29;
+    int totalAmount = passengerCount * currentFare;
 
     return Scaffold(
-      backgroundColor: const Color(
-        0xFFF7F8FA,
-      ), // Light grey background from screenshot
+      backgroundColor: const Color(0xFFF7F8FA),
       body: Stack(
         children: [
-          // Simulated 3D Bus Image (Top Right)
           Positioned(
             top: 20,
             right: -25,
             child: Transform.rotate(
               angle: -0.1,
-              child: const Text(
-                '🚌', // Acts as a placeholder for your actual 3D bus asset
-                style: TextStyle(fontSize: 100),
-              ),
+              child: const Text('🚌', style: TextStyle(fontSize: 100)),
             ),
           ),
-
           SafeArea(
             child: Column(
               children: [
-                // Top Header Row
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20.0,
@@ -965,30 +1065,35 @@ class _TicketBookingScreenState extends State<TicketBookingScreen> {
                         ),
                       ),
 
-                      // Central Route Info (580)
+                      // --- UPDATED: Dynamic Route Display & Edit Button ---
                       Column(
                         children: [
                           Row(
                             children: [
-                              const Text(
-                                "580",
-                                style: TextStyle(
+                              Text(
+                                routeController
+                                    .text, // Uses controller data instead of hardcoded "580"
+                                style: const TextStyle(
                                   fontSize: 32,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF333333),
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue[50],
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.edit,
-                                  color: Colors.blue,
-                                  size: 14,
+                              GestureDetector(
+                                onTap:
+                                    _editRouteAndFareDialog, // Triggers the popup
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[50],
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.edit,
+                                    color: Colors.blue,
+                                    size: 14,
+                                  ),
                                 ),
                               ),
                             ],
@@ -1005,19 +1110,18 @@ class _TicketBookingScreenState extends State<TicketBookingScreen> {
                           ),
                         ],
                       ),
-
-                      const SizedBox(
-                        width: 40,
-                      ), // Balances the close button width
+                      const SizedBox(width: 40),
                     ],
                   ),
                 ),
                 const SizedBox(height: 30),
 
-                // Source Stop Card
-                _buildStopCard(label: "Source Stop", stopName: sourceStop),
+                // --- UPDATED: Uses dynamic controller data ---
+                _buildStopCard(
+                  label: "Source Stop",
+                  controller: sourceController,
+                ),
 
-                // Swap Arrow
                 GestureDetector(
                   onTap: _toggleStops,
                   child: Padding(
@@ -1030,15 +1134,13 @@ class _TicketBookingScreenState extends State<TicketBookingScreen> {
                   ),
                 ),
 
-                // Destination Stop Card
+                // --- UPDATED: Uses dynamic controller data ---
                 _buildStopCard(
                   label: "Destination Stop",
-                  stopName: destinationStop,
+                  controller: destinationController,
                 ),
 
                 const Spacer(),
-
-                // Bottom Payment Information Bar
                 Container(
                   padding: const EdgeInsets.only(
                     top: 24,
@@ -1105,16 +1207,12 @@ class _TicketBookingScreenState extends State<TicketBookingScreen> {
                         ],
                       ),
                       const SizedBox(height: 24),
-
-                      // Final Checkout Button
                       SizedBox(
                         width: double.infinity,
                         height: 60,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(
-                              0xFFEF5350,
-                            ), // Red color matching the screenshot
+                            backgroundColor: const Color(0xFFEF5350),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
@@ -1126,16 +1224,17 @@ class _TicketBookingScreenState extends State<TicketBookingScreen> {
                               MaterialPageRoute(
                                 builder: (context) => ActiveTicketScreen(
                                   ticketCode: widget.ticketCode,
-                                  source: sourceStop,
-                                  destination: destinationStop,
-                                  fare: pricePerTicket * passengerCount,
-                                  routeNo: "580",
+                                  source: sourceController.text,
+                                  destination: destinationController.text,
+                                  routeNo: routeController.text,
+                                  fare:
+                                      totalAmount, // Passes the correctly calculated fare
                                 ),
                               ),
                             );
                           },
                           child: Text(
-                            "Book Bus @ ₹$totalAmount",
+                            "Book Bus @ ₹$totalAmount", // Displays the updated fare
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -1155,8 +1254,11 @@ class _TicketBookingScreenState extends State<TicketBookingScreen> {
     );
   }
 
-  // Reusable helper for the white location cards
-  Widget _buildStopCard({required String label, required String stopName}) {
+  // --- UPDATED: Helper now accepts a controller and triggers the dialog ---
+  Widget _buildStopCard({
+    required String label,
+    required TextEditingController controller,
+  }) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24.0),
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
@@ -1190,7 +1292,7 @@ class _TicketBookingScreenState extends State<TicketBookingScreen> {
                 const SizedBox(height: 8),
                 Center(
                   child: Text(
-                    stopName,
+                    controller.text, // Uses the dynamic controller text
                     style: const TextStyle(
                       fontSize: 18,
                       color: Color(0xFF333333),
@@ -1201,13 +1303,17 @@ class _TicketBookingScreenState extends State<TicketBookingScreen> {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              shape: BoxShape.circle,
+          GestureDetector(
+            onTap: () =>
+                _editValueDialog(label, controller), // Triggers the popup
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.edit, color: Colors.grey[600], size: 16),
             ),
-            child: Icon(Icons.edit, color: Colors.grey[600], size: 16),
           ),
         ],
       ),
